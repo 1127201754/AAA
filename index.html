@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>霍兰德职业兴趣测试 (完整版)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            width: 100%;
+            max-width: 600px;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        h1 { color: #333; margin-bottom: 10px; }
+        p { color: #666; line-height: 1.6; }
+
+        /* 按钮样式 */
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 20px;
+        }
+        .btn:hover { background-color: #4338ca; }
+        
+        .option-btn {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 15px;
+            background-color: #eef2ff;
+            color: #333;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s;
+        }
+        .option-btn:hover {
+            border-color: var(--primary-color);
+            background-color: #e0e7ff;
+        }
+
+        /* 进度条 */
+        .progress-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .progress-bar {
+            flex-grow: 1;
+            height: 8px;
+            background-color: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-right: 10px;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .progress-text {
+            font-size: 12px;
+            color: #888;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        /* 隐藏/显示控制 */
+        .hidden { display: none; }
+        
+        /* 结果页样式 */
+        .result-code {
+            font-size: 48px;
+            font-weight: bold;
+            color: var(--primary-color);
+            letter-spacing: 4px;
+            margin: 20px 0;
+        }
+        .chart-container {
+            position: relative;
+            height: 350px; /* 稍微调高一点以便显示 */
+            width: 100%;
+            margin-top: 20px;
+        }
+        .desc-box {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: left;
+            margin-top: 20px;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .type-title {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="welcome-screen">
+            <h1>🔍 霍兰德职业兴趣测试</h1>
+            <p>本测试包含 <strong>120道</strong> 题目，基于 RIASEC 模型。</p>
+            <p>测试大概需要 5-8 分钟，请凭直觉快速回答。</p>
+            <p style="font-size: 0.9em; color: #888;">遇到喜欢的活动选"是"，不喜欢或无感选"否"。</p>
+            <button class="btn" onclick="startQuiz()">开始测试</button>
+        </div>
+
+        <div id="quiz-screen" class="hidden">
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress"></div>
+                </div>
+                <div class="progress-text" id="progress-text">0/120</div>
+            </div>
+            
+            <h2 id="question-text" style="margin-bottom: 30px; min-height: 60px;">题目加载中...</h2>
+            
+            <div id="options-container">
+                <button class="option-btn" onclick="answer(true)">👍 是的，我喜欢/我擅长</button>
+                <button class="option-btn" onclick="answer(false)">👎 不，我不喜欢</button>
+            </div>
+        </div>
+
+        <div id="result-screen" class="hidden">
+            <h2>测试结果</h2>
+            <p>你的霍兰德代码是：</p>
+            <div class="result-code" id="result-code">---</div>
+            
+            <div class="chart-container">
+                <canvas id="radarChart"></canvas>
+            </div>
+
+            <div class="desc-box" id="result-desc">
+                </div>
+            
+            <button class="btn" onclick="location.reload()">重新测试</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 120道完整题库 ---
+        const questions = [
+            // --- R型：现实型 (Realistic) ---
+            { text: "我喜欢修理汽车或自行车", type: "R" },
+            { text: "我喜欢用木头做东西（木工）", type: "R" },
+            { text: "我喜欢组装电脑或电子设备", type: "R" },
+            { text: "我喜欢驾驶卡车或拖拉机", type: "R" },
+            { text: "我喜欢修理电器", type: "R" },
+            { text: "我喜欢摆弄机械模型", type: "R" },
+            { text: "我喜欢户外露营或徒步", type: "R" },
+            { text: "我喜欢种植花草或农作物", type: "R" },
+            { text: "我喜欢饲养动物", type: "R" },
+            { text: "我喜欢使用电动工具（如电钻、电锯）", type: "R" },
+            { text: "我喜欢上体育课或参加运动训练", type: "R" },
+            { text: "我喜欢按图纸组装家具", type: "R" },
+            { text: "我喜欢学习如何使用新的机械设备", type: "R" },
+            { text: "我喜欢在实验室里操作仪器", type: "R" },
+            { text: "我喜欢亲手建造东西", type: "R" },
+            { text: "我喜欢修缮房屋", type: "R" },
+            { text: "我喜欢钓鱼或打猎", type: "R" },
+            { text: "我喜欢操作重型机械", type: "R" },
+            { text: "我喜欢把东西拆开看它是如何工作的", type: "R" },
+            { text: "我更喜欢动手操作而不是听讲座", type: "R" },
+
+            // --- I型：研究型 (Investigative) ---
+            { text: "我喜欢阅读科技杂志或文章", type: "I" },
+            { text: "我喜欢在实验室做科学实验", type: "I" },
+            { text: "我喜欢解决复杂的数学难题", type: "I" },
+            { text: "我喜欢研究某种疾病的治疗方法", type: "I" },
+            { text: "我喜欢分析数据并发现规律", type: "I" },
+            { text: "我喜欢思考宇宙的起源", type: "I" },
+            { text: "我喜欢通过逻辑推理解决问题", type: "I" },
+            { text: "我喜欢学习计算机编程语言", type: "I" },
+            { text: "我喜欢参观科技馆或博物馆", type: "I" },
+            { text: "我喜欢研究天气变化", type: "I" },
+            { text: "我喜欢阅读非虚构类的学术书籍", type: "I" },
+            { text: "我喜欢探讨社会问题的根本原因", type: "I" },
+            { text: "我喜欢评估不同理论的优缺点", type: "I" },
+            { text: "我喜欢用显微镜观察微观世界", type: "I" },
+            { text: "我喜欢研究人类心理", type: "I" },
+            { text: "我喜欢玩解谜游戏或策略游戏", type: "I" },
+            { text: "我喜欢对事物进行分类和整理（基于科学属性）", type: "I" },
+            { text: "我喜欢从混乱的事实中理出头绪", type: "I" },
+            { text: "我喜欢客观地观察事物", type: "I" },
+            { text: "我喜欢在这个世界中寻找真理", type: "I" },
+
+            // --- A型：艺术型 (Artistic) ---
+            { text: "我喜欢画素描、油画或水彩画", type: "A" },
+            { text: "我喜欢在公共场合表演（戏剧、舞蹈）", type: "A" },
+            { text: "我喜欢演奏乐器或唱歌", type: "A" },
+            { text: "我喜欢写小说、诗歌或剧本", type: "A" },
+            { text: "我喜欢设计服装或时尚搭配", type: "A" },
+            { text: "我喜欢摄影或拍摄视频", type: "A" },
+            { text: "我喜欢设计网页或海报", type: "A" },
+            { text: "我喜欢阅读文学作品", type: "A" },
+            { text: "我喜欢参观艺术展览", type: "A" },
+            { text: "我喜欢装饰房间或进行室内设计", type: "A" },
+            { text: "我喜欢创造与众不同的东西", type: "A" },
+            { text: "我喜欢用直觉而不是逻辑来判断", type: "A" },
+            { text: "我喜欢即兴发挥", type: "A" },
+            { text: "我喜欢欣赏音乐剧或歌剧", type: "A" },
+            { text: "我喜欢练习书法或雕刻", type: "A" },
+            { text: "我喜欢构思新奇的点子", type: "A" },
+            { text: "我喜欢表达自己的情感和想法", type: "A" },
+            { text: "我喜欢不拘一格的生活方式", type: "A" },
+            { text: "我喜欢评论电影或书籍", type: "A" },
+            { text: "我喜欢做手工艺品（如陶艺、编织）", type: "A" },
+
+            // --- S型：社会型 (Social) ---
+            { text: "我喜欢教别人学习新知识", type: "S" },
+            { text: "我喜欢帮助朋友解决烦恼", type: "S" },
+            { text: "我喜欢参加志愿者活动", type: "S" },
+            { text: "我喜欢照顾生病的人", type: "S" },
+            { text: "我喜欢组织聚会或团建活动", type: "S" },
+            { text: "我喜欢给别人提建议", type: "S" },
+            { text: "我喜欢在小组中通过讨论解决问题", type: "S" },
+            { text: "我喜欢结交新朋友", type: "S" },
+            { text: "我喜欢做关于个人成长的咨询", type: "S" },
+            { text: "我喜欢阅读关于人际关系的书籍", type: "S" },
+            { text: "我喜欢照看小孩", type: "S" },
+            { text: "我喜欢倾听别人的故事", type: "S" },
+            { text: "我喜欢参与慈善募捐", type: "S" },
+            { text: "我喜欢调解朋友之间的矛盾", type: "S" },
+            { text: "我喜欢做导游或解说员", type: "S" },
+            { text: "我喜欢在这个社会中服务他人", type: "S" },
+            { text: "我喜欢与人合作而不是独自工作", type: "S" },
+            { text: "我喜欢关心别人的感受", type: "S" },
+            { text: "我喜欢向别人解释复杂的事情", type: "S" },
+            { text: "我喜欢社会福利工作", type: "S" },
+
+            // --- E型：企业型 (Enterprising) ---
+            { text: "我喜欢竞选班干部或团队领导", type: "E" },
+            { text: "我喜欢向别人推销产品或想法", type: "E" },
+            { text: "我喜欢讨价还价", type: "E" },
+            { text: "我喜欢发表演讲", type: "E" },
+            { text: "我喜欢管理一个团队来实现目标", type: "E" },
+            { text: "我喜欢创业或做小生意", type: "E" },
+            { text: "我喜欢看商业新闻或股市动态", type: "E" },
+            { text: "我喜欢承担风险以获得回报", type: "E" },
+            { text: "我喜欢策划市场营销活动", type: "E" },
+            { text: "我喜欢在辩论中说服对手", type: "E" },
+            { text: "我喜欢在这个竞争激烈的环境中获胜", type: "E" },
+            { text: "我喜欢制定策略", type: "E" },
+            { text: "我喜欢指挥别人做事", type: "E" },
+            { text: "我喜欢建立人脉网络", type: "E" },
+            { text: "我喜欢争取更高的职位", type: "E" },
+            { text: "我喜欢处理商务谈判", type: "E" },
+            { text: "我喜欢组织大型活动", type: "E" },
+            { text: "我喜欢成为注意力的焦点", type: "E" },
+            { text: "我喜欢设定富有挑战性的目标", type: "E" },
+            { text: "我喜欢影响他人的决定", type: "E" },
+
+            // --- C型：常规型 (Conventional) ---
+            { text: "我喜欢保持书桌和房间整洁有序", type: "C" },
+            { text: "我喜欢核对数字或检查错误", type: "C" },
+            { text: "我喜欢按照明确的步骤操作", type: "C" },
+            { text: "我喜欢整理档案或数据库", type: "C" },
+            { text: "我喜欢做财务预算或记账", type: "C" },
+            { text: "我喜欢编写计算机程序代码（注重规范）", type: "C" },
+            { text: "我喜欢遵守规则和制度", type: "C" },
+            { text: "我喜欢做日程安排", type: "C" },
+            { text: "我喜欢收集和整理信息", type: "C" },
+            { text: "我喜欢操作办公软件（如Excel）", type: "C" },
+            { text: "我喜欢抄写或录入文字", type: "C" },
+            { text: "我喜欢校对文章中的错别字", type: "C" },
+            { text: "我喜欢做库存盘点", type: "C" },
+            { text: "我喜欢在固定的时间做固定的事", type: "C" },
+            { text: "我喜欢明确的指令，不喜欢模糊不清", type: "C" },
+            { text: "我喜欢填写各种表格", type: "C" },
+            { text: "我喜欢分析图表和统计数据", type: "C" },
+            { text: "我喜欢做行政助理类的工作", type: "C" },
+            { text: "我喜欢保管重要的文件或物品", type: "C" },
+            { text: "我喜欢高效率地处理日常事务", type: "C" }
+        ];
+
+        const typeDescriptions = {
+            "R": "<span class='type-title'>R (现实型/做)</span>: 动手能力强，喜欢通过操作工具或机械解决具体问题。适合：工程师、技术员、机械师、动植物管理。",
+            "I": "<span class='type-title'>I (研究型/想)</span>: 逻辑性强，喜欢观察、分析和解决科学问题。适合：科研人员、程序员、数据分析师、数学家。",
+            "A": "<span class='type-title'>A (艺术型/创)</span>: 想象力丰富，追求创造性和自我表达。适合：设计师、作家、演员、编辑、建筑师。",
+            "S": "<span class='type-title'>S (社会型/人)</span>: 乐于助人，擅长沟通和教育。适合：教师、咨询师、社工、护理人员、人力资源。",
+            "E": "<span class='type-title'>E (企业型/带)</span>: 精力充沛，喜欢领导和影响他人，追求成就。适合：经理、销售、创业者、律师、政治家。",
+            "C": "<span class='type-title'>C (常规型/守)</span>: 做事严谨，喜欢有序、规范的数据处理工作。适合：会计、行政、银行职员、档案管理。"
+        };
+
+        // --- 状态变量 ---
+        let currentQuestionIndex = 0;
+        let scores = { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 };
+
+        // --- 核心逻辑 ---
+        function startQuiz() {
+            document.getElementById('welcome-screen').classList.add('hidden');
+            document.getElementById('quiz-screen').classList.remove('hidden');
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            const q = questions[currentQuestionIndex];
+            document.getElementById('question-text').innerText = q.text;
+            
+            // 更新进度条
+            const percent = ((currentQuestionIndex) / questions.length) * 100;
+            document.getElementById('progress').style.width = percent + "%";
+            document.getElementById('progress-text').innerText = `${currentQuestionIndex + 1}/${questions.length}`;
+        }
+
+        function answer(isLike) {
+            if (isLike) {
+                const type = questions[currentQuestionIndex].type;
+                scores[type]++;
+            }
+
+            currentQuestionIndex++;
+
+            if (currentQuestionIndex < questions.length) {
+                loadQuestion();
+            } else {
+                showResults();
+            }
+        }
+
+        function showResults() {
+            document.getElementById('quiz-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.remove('hidden');
+
+            // 1. 计算前三名代码
+            const sortedTypes = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+            const top3 = sortedTypes.slice(0, 3).map(item => item[0]).join("");
+            
+            document.getElementById('result-code').innerText = top3;
+
+            // 2. 生成描述文字
+            let descHtml = "";
+            sortedTypes.slice(0, 3).forEach(item => {
+                descHtml += `<p>${typeDescriptions[item[0]]} (得分: ${item[1]})</p>`;
+            });
+            document.getElementById('result-desc').innerHTML = descHtml;
+
+            // 3. 渲染雷达图
+            renderChart();
+        }
+
+        function renderChart() {
+            const ctx = document.getElementById('radarChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['现实型 (R)', '研究型 (I)', '艺术型 (A)', '社会型 (S)', '企业型 (E)', '常规型 (C)'],
+                    datasets: [{
+                        label: '职业兴趣得分',
+                        data: [scores.R, scores.I, scores.A, scores.S, scores.E, scores.C],
+                        backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                        borderColor: 'rgba(79, 70, 229, 1)',
+                        pointBackgroundColor: 'rgba(79, 70, 229, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    scales: {
+                        r: {
+                            angleLines: { display: true },
+                            suggestedMin: 0,
+                            suggestedMax: 20 // 已更新为20
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
+
